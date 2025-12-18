@@ -72,19 +72,24 @@ export default function AuthPage() {
     }
   };
 
-  const handleSignIn = async (data: SignInFormValues) => {
+  const handleSignIn = (data: SignInFormValues) => {
     setIsLoading(true);
-    try {
-      initiateEmailSignIn(auth, data.email, data.password);
-      // The onAuthStateChanged listener will handle the redirect
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Sign In Failed',
-        description: 'Invalid email or password.',
+    initiateEmailSignIn(auth, data.email, data.password)
+      .catch((error: any) => {
+        // This catch block will now handle failed sign-in attempts
+        let description = 'An unexpected error occurred.';
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+          description = 'Invalid email or password. Please try again.';
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Sign In Failed',
+          description: description,
+        });
+        setIsLoading(false); // Stop loading indicator on failure
       });
-      setIsLoading(false);
-    }
+      // A successful sign-in will be handled by the onAuthStateChanged listener, which triggers a redirect.
+      // So, we don't need a .then() block here to set isLoading to false.
   };
 
   if (isUserLoading || user) {

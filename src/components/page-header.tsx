@@ -21,7 +21,7 @@ export function PageHeader() {
             <>
               <div className="flex items-center gap-2">
                 <UserIcon className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">{user.email}</span>
+                <span className="text-sm font-medium">{user.displayName || user.email}</span>
               </div>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />

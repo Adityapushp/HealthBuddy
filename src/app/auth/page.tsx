@@ -17,6 +17,8 @@ import { Logo } from '@/components/logo';
 import { Loader2 } from 'lucide-react';
 
 const signUpSchema = z.object({
+  firstName: z.string().min(1, { message: 'First name is required.' }),
+  lastName: z.string().min(1, { message: 'Last name is required.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 });
@@ -38,7 +40,7 @@ export default function AuthPage() {
 
   const signUpForm = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { firstName: '', lastName: '', email: '', password: '' },
   });
 
   const signInForm = useForm<SignInFormValues>({
@@ -55,7 +57,7 @@ export default function AuthPage() {
   const handleSignUp = async (data: SignUpFormValues) => {
     setIsLoading(true);
     try {
-      initiateEmailSignUp(auth, data.email, data.password);
+      initiateEmailSignUp(auth, data.email, data.password, data.firstName, data.lastName);
       // The onAuthStateChanged listener in FirebaseProvider will handle the redirect
       toast({
         title: 'Account Created',
@@ -148,6 +150,22 @@ export default function AuthPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input id="firstName" placeholder="John" {...signUpForm.register('firstName')} />
+                        {signUpForm.formState.errors.firstName && (
+                        <p className="text-sm text-destructive">{signUpForm.formState.errors.firstName.message}</p>
+                        )}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input id="lastName" placeholder="Doe" {...signUpForm.register('lastName')} />
+                        {signUpForm.formState.errors.lastName && (
+                        <p className="text-sm text-destructive">{signUpForm.formState.errors.lastName.message}</p>
+                        )}
+                    </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="email-signup">Email</Label>
                   <Input id="email-signup" type="email" placeholder="m@example.com" {...signUpForm.register('email')} />

@@ -1,0 +1,145 @@
+/**
+ * This ruleset enforces a strict user-ownership model for the MediTrack application.
+ * All sensitive user data, including profiles, appointments, and medications, is
+ * stored within a hierarchical structure under /users/{userId}, ensuring that only
+ * the authenticated owner of that data can access or modify it.
+ *
+ * Core Philosophy:
+ * The security model is built on path-based authorization. A user's unique ID ({userId})
+ * is part of the document path for all their personal data. This makes ownership checks
+ * fast, simple, and avoids costly cross-document reads (`get()`) in rules.
+ *
+ * Data Structure:
+ * - /users/{userId}: The root document for a user's profile.
+ * - /users/{userId}/appointments/{appointmentId}: A subcollection for a user's appointments.
+ * - /users/{userId}/medications/{medicationId}: A subcollection for a user's medications.
+ * - /doctors/{doctorId}: A top-level collection containing public information about doctors.
+ *
+ * Key Security Decisions:
+ * - Strict Ownership: All data under /users/{userId} is accessible only by the user
+ *   whose UID matches {userId}.
+ * - No User Listing: Listing the top-level /users collection is explicitly disallowed
+ *   to protect user privacy.
+ * - Public Directory: The /doctors collection is publicly readable by anyone, allowing
+ *   users to browse for doctors. Writes to this collection are disabled by default
+ *   and should be managed by a trusted admin role or backend process.
+ * - Relational Integrity: On creation, documents in user subcollections must contain a
+ *   `userProfileId` that matches the {userId} from the path. This field is immutable
+ *   to prevent data from being moved between users.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions to improve readability and reuse of logic.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Checks if a document being updated or deleted actually exists.
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    // Combines ownership and existence checks for state-changing operations.
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    // Validates that the user profile document contains a self-referencing ID on creation.
+    function hasValidUserProfileDataOnCreate(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    // Ensures the self-referencing ID in a user profile is not changed after creation.
+    function isUserProfileDataImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+    
+    // Validates that a new appointment document is correctly linked to its parent user.
+    function hasValidAppointmentDataOnCreate(userId) {
+      return request.resource.data.userProfileId == userId;
+    }
+
+    // Ensures the user link in an appointment is not changed after creation.
+    function isAppointmentDataImmutable() {
+      return request.resource.data.userProfileId == resource.data.userProfileId;
+    }
+
+    // Validates that a new medication document is correctly linked to its parent user.
+    function hasValidMedicationDataOnCreate(userId) {
+      return request.resource.data.userProfileId == userId;
+    }
+    
+    // Ensures the user link in a medication is not changed after creation.
+    function isMedicationDataImmutable() {
+      return request.resource.data.userProfileId == resource.data.userProfileId;
+    }
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document for the first time.
+     * @deny  (get) An authenticated user attempting to read another user's profile.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow create: if isOwner(userId) && hasValidUserProfileDataOnCreate(userId);
+      allow get: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && isUserProfileDataImmutable();
+      allow delete: if isExistingOwner(userId);
+      allow list: if false;
+    }
+
+    /**
+     * @description Secures the subcollection of appointments for a specific user.
+     * @path /users/{userId}/appointments/{appointmentId}
+     * @allow (create) An authenticated user adding a new appointment to their own schedule.
+     * @deny  (list) An authenticated user attempting to list another user's appointments.
+     * @principle Enforces document ownership within a user's private subcollection.
+     */
+    match /users/{userId}/appointments/{appointmentId} {
+      allow create: if isOwner(userId) && hasValidAppointmentDataOnCreate(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && isAppointmentDataImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secures the subcollection of medications for a specific user.
+     * @path /users/{userId}/medications/{medicationId}
+     * @allow (get) An authenticated user reading one of their own medication records.
+     * @deny  (update) An authenticated user attempting to modify another user's medication.
+     * @principle Enforces document ownership within a user's private subcollection.
+     */
+    match /users/{userId}/medications/{medicationId} {
+      allow create: if isOwner(userId) && hasValidMedicationDataOnCreate(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && isMedicationDataImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rules for the public directory of doctors.
+     * @path /doctors/{doctorId}
+     * @allow (get) Any user, authenticated or not, reading a doctor's profile.
+     * @deny  (create) Any client attempting to add a new doctor to the directory.
+     * @principle Provides public read access while restricting writes to a trusted source.
+     */
+    match /doctors/{doctorId} {
+      allow get: if true;
+      allow list: if true;
+      // CRITICAL: Cannot implement owner-only writes. The 'Doctor' entity is missing an 'ownerId' or 'creatorId' field.
+      // Writes are disabled. This data should be managed by a backend admin process.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+  }
+}

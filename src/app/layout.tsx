@@ -4,7 +4,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'MediTrack',
+  title: 'HealthBuddy',
   description: 'Track your medications and appointments with ease.',
 };
 

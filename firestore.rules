@@ -1,5 +1,5 @@
 /**
- * This ruleset enforces a strict user-ownership model for the MediTrack application.
+ * This ruleset enforces a strict user-ownership model for the HealthBuddy application.
  * All sensitive user data, including profiles, appointments, and medications, is
  * stored within a hierarchical structure under /users/{userId}, ensuring that only
  * the authenticated owner of that data can access or modify it.

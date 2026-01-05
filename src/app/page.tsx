@@ -39,7 +39,7 @@ export default function Home() {
       </main>
       <footer className="py-4">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
-          MediTrack &copy; {new Date().getFullYear()}
+          HealthBuddy &copy; {new Date().getFullYear()}
         </div>
       </footer>
     </div>
